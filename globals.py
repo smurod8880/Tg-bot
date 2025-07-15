@@ -4,8 +4,8 @@ import os
 # Если не используете переменные окружения, задайте значения здесь:
 
 # Для Telegram:
-MANUAL_TELEGRAM_BOT_TOKEN = "ваш_токен_бота"
-MANUAL_TELEGRAM_CHAT_ID = "ваш_chat_id"
+MANUAL_TELEGRAM_BOT_TOKEN = "8177951186:AAH6h4_BEezrjDFIwdDUfiqxPNv-8aCb8u0"
+MANUAL_TELEGRAM_CHAT_ID = "5331567990"
 
 # Торговые пары и таймфреймы
 TRADING_PAIRS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
