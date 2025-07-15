@@ -1,0 +1,20 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="crypto_trading_bot",
+    version="1.0",
+    packages=find_packages(),
+    install_requires=[
+        "fastapi==0.103.2",
+        "uvicorn==0.23.2",
+        "pandas==2.0.3",
+        "python-binance==1.0.22",
+        "aiohttp==3.8.5",
+        "python-telegram-bot==20.3",
+        "websockets==11.0.3",
+        "requests==2.31.0",
+        "numpy==1.24.3",
+        "pandas_ta==0.3.14b0",
+        "setuptools==68.2.2"
+    ]
+)
