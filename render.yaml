@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: crypto-trading-bot-final
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      python -m venv venv
+      source venv/bin/activate
+      pip install --upgrade pip setuptools
+      pip install -r requirements.txt
+    startCommand: |
+      source venv/bin/activate
+      uvicorn main:app --host=0.0.0.0 --port=10000
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: TELEGRAM_BOT_TOKEN
+        value: ваш_токен
+      - key: TELEGRAM_CHAT_ID
+        value: ваш_chat_id
