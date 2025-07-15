@@ -15,7 +15,7 @@ class SignalAnalyzer:
     def __init__(self):
         self.indicators = TechnicalIndicators()
         self.active = True
-        self.pending_signals = {}  # Сигналы ожидающие подтверждения
+        self.pending_signals = {}
         
     async def analyze_all(self):
         """Анализ всех пар и таймфреймов"""
@@ -26,9 +26,7 @@ class SignalAnalyzer:
                         if len(market_data[symbol][timeframe]) > 100:
                             await self.analyze_symbol(symbol, timeframe)
                 
-                # Проверка подтверждения ожидающих сигналов
                 await self.check_pending_signals()
-                
                 await asyncio.sleep(5)
             except Exception as e:
                 logger.error(f"Analysis loop error: {e}")
@@ -40,17 +38,13 @@ class SignalAnalyzer:
         expired_signals = []
         
         for signal_id, signal_data in self.pending_signals.items():
-            # Проверяем только сигналы, ожидающие более 1 минуты
             if current_time - signal_data['timestamp'] > 60:
                 if await self.is_signal_confirmed(signal_data):
-                    # Сигнал подтвержден - отправляем
                     await self.send_confirmed_signal(signal_data)
                     expired_signals.append(signal_id)
                 else:
-                    # Сигнал не подтвержден - отбрасываем
                     expired_signals.append(signal_id)
         
-        # Удаляем обработанные сигналы
         for signal_id in expired_signals:
             del self.pending_signals[signal_id]
     
@@ -60,10 +54,9 @@ class SignalAnalyzer:
         signal_type = signal_data['signal_type']
         base_timeframe = signal_data['timeframe']
         
-        # Получаем высшие таймфреймы для проверки
         higher_timeframes = TIMEFRAME_HIERARCHY.get(base_timeframe, [])
         if not higher_timeframes:
-            return True  # Для высшего ТФ подтверждение не требуется
+            return True
             
         confirmation_strength = 0
         required_confirmations = len(higher_timeframes)
@@ -74,19 +67,19 @@ class SignalAnalyzer:
                 if df.empty:
                     continue
                     
-                # Рассчитываем индикаторы для высшего ТФ
                 df = self.indicators.calculate_all_indicators(df)
                 latest = df.iloc[-1]
                 
-                # Проверяем направление сигнала
-                if signal_type == 'BUY':
-                    if latest['EMA_12'] > latest['EMA_26'] and latest['MACD'] > latest['MACD_signal']:
-                        confirmation_strength += 1
-                else:  # SELL
-                    if latest['EMA_12'] < latest['EMA_26'] and latest['MACD'] < latest['MACD_signal']:
-                        confirmation_strength += 1
+                try:
+                    if signal_type == 'BUY':
+                        if latest['EMA_12'] > latest['EMA_26'] and latest['MACD'] > latest['MACD_signal']:
+                            confirmation_strength += 1
+                    else:  # SELL
+                        if latest['EMA_12'] < latest['EMA_26'] and latest['MACD'] < latest['MACD_signal']:
+                            confirmation_strength += 1
+                except KeyError:
+                    continue
         
-        # Рассчитываем уровень подтверждения
         confirmation_level = confirmation_strength / required_confirmations
         return confirmation_level >= CONFIRMATION_THRESHOLD
     
@@ -102,7 +95,6 @@ class SignalAnalyzer:
             signal_data['indicators'],
             signal_id
         )
-        # Запускаем отслеживание результата сигнала
         asyncio.create_task(self.track_signal_result(signal_id, signal_data))
     
     async def track_signal_result(self, signal_id, signal_data):
@@ -110,30 +102,30 @@ class SignalAnalyzer:
         symbol = signal_data['symbol']
         timeframe = signal_data['timeframe']
         signal_type = signal_data['signal_type']
-        entry_price = market_data[symbol][timeframe][-1]['close']
         
-        # Ждем 4 часа (для дневного ТФ - 24 часа)
+        try:
+            entry_price = market_data[symbol][timeframe][-1]['close']
+        except (KeyError, IndexError):
+            logger.error(f"Can't get entry price for {signal_id}")
+            return
+        
         wait_hours = 4 if timeframe != '1d' else 24
         await asyncio.sleep(wait_hours * 3600)
         
-        if symbol in market_data and timeframe in market_data[symbol]:
+        try:
             current_price = market_data[symbol][timeframe][-1]['close']
             price_change = (current_price - entry_price) / entry_price
             
-            # Определяем успешность сигнала
             profitable = (signal_type == 'BUY' and price_change > 0.01) or \
                         (signal_type == 'SELL' and price_change < -0.01)
             
-            # Обновляем статистику
             update_signal_result(signal_id, profitable)
             
-            # Обновляем счетчик
             if profitable:
                 bot_status['profitable_signals'] += 1
             else:
                 bot_status['unprofitable_signals'] += 1
             
-            # Адаптация весов
             LearningSystem.update_weights({
                 'id': signal_id,
                 'symbol': symbol,
@@ -142,7 +134,9 @@ class SignalAnalyzer:
                 'indicators': signal_data['indicators'],
                 'profitable': profitable
             })
-    
+        except Exception as e:
+            logger.error(f"Error tracking signal {signal_id}: {e}")
+
     async def analyze_symbol(self, symbol, timeframe):
         try:
             data = market_data[symbol][timeframe]
@@ -156,51 +150,51 @@ class SignalAnalyzer:
                 
             latest = df.iloc[-1]
             
-            # Расчет сигналов индикаторов
             signals = self.calculate_indicator_signals(latest)
-            
-            # Расчет силы сигнала
             strength, indicators = self.calculate_signal_strength(signals)
             
-            if strength >= SIGNAL_THRESHOLD and len(indicators) >= MIN_INDICATORS:
+            if abs(strength) >= SIGNAL_THRESHOLD and len(indicators) >= MIN_INDICATORS:
                 signal_type = "BUY" if strength > 0 else "SELL"
                 signal_id = self.register_pending_signal(
-                    symbol, timeframe, signal_type, strength, indicators
+                    symbol, timeframe, signal_type, abs(strength), indicators
                 )
-    
+        except Exception as e:
+            logger.error(f"Error analyzing {symbol}/{timeframe}: {e}")
+
     def calculate_indicator_signals(self, latest):
         """Расчет сигналов для всех индикаторов"""
         signals = {}
         
-        # Трендовые индикаторы
-        signals['EMA'] = 1.0 if latest['EMA_12'] > latest['EMA_26'] else -1.0
-        signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
-        signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
-        signals['Supertrend'] = 1.0 if latest['Supertrend'] == 1 else -1.0
-        signals['Ichimoku'] = 1.0 if latest['Ichimoku'] > 0 else -1.0
-        signals['ADX'] = 1.0 if latest['ADX'] > 25 else 0.0
-        
-        # Осцилляторы
-        signals['RSI'] = -1.0 if latest['RSI'] > 70 else 1.0 if latest['RSI'] < 30 else 0.0
-        signals['Stochastic'] = 1.0 if latest['Stoch_k'] < 20 and latest['Stoch_d'] < 20 else -1.0 if latest['Stoch_k'] > 80 and latest['Stoch_d'] > 80 else 0.0
-        signals['Williams'] = 1.0 if latest['Williams'] < -80 else -1.0 if latest['Williams'] > -20 else 0.0
-        signals['CCI'] = 1.0 if latest['CCI'] < -100 else -1.0 if latest['CCI'] > 100 else 0.0
-        
-        # Волатильность
-        signals['Bollinger_Bands'] = -1.0 if latest['close'] > latest['BB_upper'] else 1.0 if latest['close'] < latest['BB_lower'] else 0.0
-        signals['Keltner_Channel'] = -1.0 if latest['close'] > latest['KC_upper'] else 1.0 if latest['close'] < latest['KC_lower'] else 0.0
-        
-        # Объем
-        signals['Volume_Oscillator'] = 1.0 if latest['Volume_Osc'] > 0 else -1.0
-        signals['OBV'] = 1.0 if latest['OBV_trend'] > 0 else -1.0
-        
-        # Свечные модели
-        signals['Engulfing'] = 1.0 if latest['Bullish_Engulfing'] else -1.0 if latest['Bearish_Engulfing'] else 0.0
-        signals['Hammer'] = 1.0 if latest['Hammer'] else 0.0
-        signals['Pin_Bar'] = 1.0 if latest['Pin_Bar_bull'] else -1.0 if latest['Pin_Bar_bear'] else 0.0
+        try:
+            # Трендовые индикаторы
+            signals['EMA'] = 1.0 if latest['EMA_12'] > latest['EMA_26'] else -1.0
+            signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
+            signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
+            
+            # Осцилляторы
+            signals['RSI'] = -1.0 if latest.get('RSI', 0) > 70 else 1.0 if latest.get('RSI', 0) < 30 else 0.0
+            signals['Stochastic'] = 1.0 if latest.get('Stoch_k', 0) < 20 and latest.get('Stoch_d', 0) < 20 else -1.0 if latest.get('Stoch_k', 0) > 80 and latest.get('Stoch_d', 0) > 80 else 0.0
+            signals['Williams'] = 1.0 if latest.get('Williams', 0) < -80 else -1.0 if latest.get('Williams', 0) > -20 else 0.0
+            
+            # Волатильность
+            signals['Bollinger_Bands'] = -1.0 if latest['close'] > latest.get('BB_upper', 0) else 1.0 if latest['close'] < latest.get('BB_lower', 0) else 0.0
+            signals['Keltner_Channel'] = -1.0 if latest['close'] > latest.get('KC_upper', 0) else 1.0 if latest['close'] < latest.get('KC_lower', 0) else 0.0
+            
+            # Объем
+            signals['Volume_Oscillator'] = 1.0 if latest.get('Volume_Osc', 0) > 0 else -1.0
+            signals['OBV'] = 1.0 if latest.get('OBV_trend', 0) > 0 else -1.0
+            
+            # Свечные модели
+            signals['Engulfing'] = 1.0 if latest.get('Bullish_Engulfing', False) else -1.0 if latest.get('Bearish_Engulfing', False) else 0.0
+            signals['Hammer'] = 1.0 if latest.get('Hammer', False) else 0.0
+            signals['Pin_Bar'] = 1.0 if latest.get('Pin_Bar_bull', False) else -1.0 if latest.get('Pin_Bar_bear', False) else 0.0
+            
+        except KeyError as e:
+            logger.error(f"Missing indicator data: {e}")
+            return {}
         
         return signals
-    
+
     def calculate_signal_strength(self, signals):
         """Расчет общей силы сигнала"""
         total_strength = 0
@@ -219,7 +213,7 @@ class SignalAnalyzer:
             
         signal_strength = total_strength / total_weight
         return signal_strength, active_indicators
-    
+
     def register_pending_signal(self, symbol, timeframe, signal_type, strength, indicators):
         """Регистрация сигнала ожидающего подтверждения"""
         signal_id = f"{symbol}-{timeframe}-{int(time.time())}"
@@ -228,20 +222,20 @@ class SignalAnalyzer:
             'symbol': symbol,
             'timeframe': timeframe,
             'signal_type': signal_type,
-            'strength': abs(strength),
+            'strength': strength,
             'accuracy': self.calculate_accuracy(),
             'indicators': indicators,
             'timestamp': time.time()
         }
         return signal_id
-    
+
     def calculate_accuracy(self):
         """Расчет точности на основе исторических данных"""
         total = bot_status['profitable_signals'] + bot_status['unprofitable_signals']
         if total > 0:
             accuracy = bot_status['profitable_signals'] / total
-            return max(0.7, min(0.98, accuracy))  # Ограничиваем диапазон
-        return 0.93  # Значение по умолчанию
+            return max(0.7, min(0.98, accuracy))
+        return 0.93
 
 def start_analysis():
     global analysis_task
