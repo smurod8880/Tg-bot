@@ -14,9 +14,9 @@ async def send_telegram_message(message: str, reply_markup=None, max_retries=3):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         logger.error("Telegram credentials not set. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in environment variables.")
         return False
-    # Проверка валидности токена (простая проверка на длину и символы)
+    # Проверка валидности токена
     if len(TELEGRAM_BOT_TOKEN) < 20 or ':' not in TELEGRAM_BOT_TOKEN:
-        logger.error("Invalid TELEGRAM_BOT_TOKEN format. Please verify the token.")
+        logger.error("Invalid TELEGRAM_BOT_TOKEN format. Please verify the token (e.g., 123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11).")
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -38,7 +38,7 @@ async def send_telegram_message(message: str, reply_markup=None, max_retries=3):
                     else:
                         logger.error(f"Failed to send message. Attempt {attempt + 1}/{max_retries}. Status: {response.status}, Response: {response_text}")
                         if response.status == 405:
-                            logger.error("405 Method Not Allowed: Ensure POST request is allowed and URL is correct. Retrying...")
+                            logger.error("405 Method Not Allowed: This may indicate a token issue or network restriction. Retrying...")
                         elif response.status == 429:  # Too Many Requests
                             retry_after = int(response.headers.get('Retry-After', 5))
                             await asyncio.sleep(retry_after)
@@ -51,6 +51,7 @@ async def send_telegram_message(message: str, reply_markup=None, max_retries=3):
             if attempt == max_retries - 1:
                 return False
             await asyncio.sleep(2 ** attempt)
+    return False
 
 async def send_signal(symbol, timeframe, signal_type, strength, accuracy, indicators, signal_id):
     try:
@@ -95,7 +96,7 @@ async def handle_telegram_updates():
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
     offset = 0
-    while bot_status['running']:
+    while bot_status.get('running', False):
         try:
             params = {'offset': offset, 'timeout': 30}
             async with aiohttp.ClientSession() as session:
@@ -121,7 +122,7 @@ async def process_message(message):
         logger.warning(f"Invalid chat_id: {chat_id}")
         return
     if text == '/start':
-        if bot_status['running']:
+        if bot_status.get('running', False):
             await send_telegram_message("🤖 Бот уже запущен!")
             return
         bot_status['first_run'] = True
@@ -129,10 +130,11 @@ async def process_message(message):
         from core import init_bot
         await init_bot()
         await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
-        if bot_status['first_run']:
+        if bot_status.get('first_run', False):
             await send_demo_signal()
             await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
             bot_status['first_run'] = False
+        bot_status['running'] = True
 
 # Функция для запуска Telegram обновлений как отдельной задачи
 async def start_telegram_listener():
