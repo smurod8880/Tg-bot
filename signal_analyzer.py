@@ -22,10 +22,10 @@ class SignalAnalyzer:
             try:
                 for symbol in market_data:
                     for timeframe in market_data[symbol]:
-                        if len(market_data[symbol][timeframe]) > 100:
+                        if len(market_data[symbol][timeframe]) > 50:
                             await self.analyze_symbol(symbol, timeframe)
                 await self.check_pending_signals()
-                await asyncio.sleep(10)
+                await asyncio.sleep(3)
             except Exception as e:
                 logger.error(f"Analysis loop error: {e}")
                 await asyncio.sleep(10)
@@ -34,7 +34,7 @@ class SignalAnalyzer:
         current_time = time.time()
         expired_signals = []
         for signal_id, signal_data in self.pending_signals.items():
-            if current_time - signal_data['timestamp'] > 60:
+            if current_time - signal_data['timestamp'] > 30:
                 if await self.is_signal_confirmed(signal_data):
                     await self.send_confirmed_signal(signal_data)
                     expired_signals.append(signal_id)
@@ -61,16 +61,14 @@ class SignalAnalyzer:
                 latest = df.iloc[-1]
                 try:
                     if signal_type == 'BUY':
-                        if (latest['EMA_12'] > latest['EMA_26'] and 
-                            latest['MACD'] > latest['MACD_signal'] and
-                            latest['RSI'] < 70 and latest['RSI'] > 30 and
-                            latest['close'] > latest['BB_middle']):
+                        if (latest['EMA_12'] > latest['EMA_26'] or 
+                            latest['MACD'] > latest['MACD_signal'] or
+                            latest['close'] > latest['BB_middle']) and latest['ADX'] > 20 and latest['OBV_trend'] > 0:
                             confirmation_strength += 1
                     else:
-                        if (latest['EMA_12'] < latest['EMA_26'] and 
-                            latest['MACD'] < latest['MACD_signal'] and
-                            latest['RSI'] > 30 and latest['RSI'] < 70 and
-                            latest['close'] < latest['BB_middle']):
+                        if (latest['EMA_12'] < latest['EMA_26'] or 
+                            latest['MACD'] < latest['MACD_signal'] or
+                            latest['close'] < latest['BB_middle']) and latest['ADX'] > 20 and latest['OBV_trend'] < 0:
                             confirmation_strength += 1
                 except KeyError:
                     continue
@@ -125,7 +123,7 @@ class SignalAnalyzer:
     async def analyze_symbol(self, symbol, timeframe):
         try:
             data = market_data[symbol][timeframe]
-            if len(data) < 200:
+            if len(data) < 50:
                 return
             df = pd.DataFrame(data[-200:])
             df = self.indicators.calculate_all_indicators(df)
@@ -149,11 +147,11 @@ class SignalAnalyzer:
             signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
             signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
             signals['Supertrend'] = 1.0 if latest['Supertrend'] > 0 else -1.0
-            signals['ADX'] = 1.0 if latest['ADX'] > 25 else 0.0
-            signals['RSI'] = -1.0 if latest.get('RSI', 0) > 70 else 1.0 if latest.get('RSI', 0) < 30 else 0.0
-            signals['Stochastic'] = 1.0 if latest.get('Stoch_k', 0) < 20 and latest.get('Stoch_d', 0) < 20 else -1.0 if latest.get('Stoch_k', 0) > 80 and latest.get('Stoch_d', 0) > 80 else 0.0
-            signals['Williams'] = 1.0 if latest.get('Williams', 0) < -80 else -1.0 if latest.get('Williams', 0) > -20 else 0.0
-            signals['CCI'] = 1.0 if latest.get('CCI', 0) < -100 else -1.0 if latest.get('CCI', 0) > 100 else 0.0
+            signals['ADX'] = 1.0 if latest['ADX'] > 20 else 0.0
+            signals['RSI'] = -1.0 if latest.get('RSI', 0) > 65 else 1.0 if latest.get('RSI', 0) < 35 else 0.0
+            signals['Stochastic'] = 1.0 if latest.get('Stoch_k', 0) < 25 and latest.get('Stoch_d', 0) < 25 else -1.0 if latest.get('Stoch_k', 0) > 75 and latest.get('Stoch_d', 0) > 75 else 0.0
+            signals['Williams'] = 1.0 if latest.get('Williams', 0) < -75 else -1.0 if latest.get('Williams', 0) > -25 else 0.0
+            signals['CCI'] = 1.0 if latest.get('CCI', 0) < -90 else -1.0 if latest.get('CCI', 0) > 90 else 0.0
             signals['Bollinger_Bands'] = -1.0 if latest['close'] > latest.get('BB_upper', 0) else 1.0 if latest['close'] < latest.get('BB_lower', 0) else 0.0
             signals['Keltner_Channel'] = -1.0 if latest['close'] > latest.get('KC_upper', 0) else 1.0 if latest['close'] < latest.get('KC_lower', 0) else 0.0
             signals['Volume_Oscillator'] = 1.0 if latest.get('Volume_Osc', 0) > 0 else -1.0
