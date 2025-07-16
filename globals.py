@@ -1,25 +1,16 @@
 import os
 
-# ======== НАСТРОЙКИ ДЛЯ РУЧНОГО ИЗМЕНЕНИЯ ========
-# Если не используете переменные окружения, задайте значения здесь:
-
-# Для Telegram:
 MANUAL_TELEGRAM_BOT_TOKEN = "8177951186:AAH6h4_BEezrjDFIwdDUfiqxPNv-8aCb8u0"
 MANUAL_TELEGRAM_CHAT_ID = "5331567990"
 
-# Торговые пары и таймфреймы
 TRADING_PAIRS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
                  'DOGEUSDT', 'ADAUSDT', 'MATICUSDT', 'AVAXUSDT', 'DOTUSDT']
 TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
 
-# Пороговые значения
-SIGNAL_THRESHOLD = 0.9  # Увеличено с 0.85 для ~90% вероятности успеха
-MIN_INDICATORS = 7  # Увеличено с 5 для более строгих условий
-CONFIRMATION_THRESHOLD = 0.8  # Увеличено с 0.7 для более надежного подтверждения
+SIGNAL_THRESHOLD = 0.85
+MIN_INDICATORS = 5
+CONFIRMATION_THRESHOLD = 0.7
 
-# ================================================
-
-# Состояние бота
 bot_status = {
     'running': False,
     'paused': False,
@@ -28,13 +19,11 @@ bot_status = {
     'signals_sent': 0,
     'profitable_signals': 0,
     'unprofitable_signals': 0,
-    'first_run': True  # Добавлено для отслеживания первого запуска
+    'first_run': True
 }
 
-# Данные рынка
 market_data = {}
 
-# Веса индикаторов (базовые значения)
 indicator_weights = {
     'EMA': 0.05,
     'SMA': 0.05,
@@ -68,11 +57,9 @@ indicator_weights = {
     'Stability_Filter': 0.08
 }
 
-# Конфигурация Telegram
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', MANUAL_TELEGRAM_BOT_TOKEN)
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', MANUAL_TELEGRAM_CHAT_ID)
 
-# Иерархия таймфреймов для подтверждения сигналов
 TIMEFRAME_HIERARCHY = {
     '1m': ['5m', '15m'],
     '5m': ['15m', '30m'],
