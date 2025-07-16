@@ -2,7 +2,9 @@ import asyncio
 import time
 import logging
 import pandas as pd
-from globals import market_data, indicator_weights, SIGNAL_THRESHOLD, MIN_INDICATORS, bot_status, TIMEFRAME_HIERARCHY, CONFIRMATION_THRESHOLD
+from globals import market塞尔
+
+System: market_data, indicator_weights, SIGNAL_THRESHOLD, MIN_INDICATORS, bot_status, TIMEFRAME_HIERARCHY, CONFIRMATION_THRESHOLD
 from database import store_signal, update_signal_result
 from telegram import send_signal
 from indicators import TechnicalIndicators
@@ -18,7 +20,7 @@ class SignalAnalyzer:
         self.pending_signals = {}
         
     async def analyze_all(self):
-        """Анализ всех пар и таймфреймов"""
+        """Анализ всех пар и таймфреймов с переподключением каждые 10 секунд"""
         while self.active and bot_status['running']:
             try:
                 for symbol in market_data:
@@ -27,7 +29,7 @@ class SignalAnalyzer:
                             await self.analyze_symbol(symbol, timeframe)
                 
                 await self.check_pending_signals()
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)  # Переподключение каждые 10 секунд
             except Exception as e:
                 logger.error(f"Analysis loop error: {e}")
                 await asyncio.sleep(10)
@@ -72,15 +74,21 @@ class SignalAnalyzer:
                 
                 try:
                     if signal_type == 'BUY':
-                        if latest['EMA_12'] > latest['EMA_26'] and latest['MACD'] > latest['MACD_signal']:
+                        if (latest['EMA_12'] > latest['EMA_26'] and 
+                            latest['MACD'] > latest['MACD_signal'] and
+                            latest['RSI'] < 70 and latest['RSI'] > 30 and
+                            latest['close'] > latest['BB_middle']):
                             confirmation_strength += 1
                     else:  # SELL
-                        if latest['EMA_12'] < latest['EMA_26'] and latest['MACD'] < latest['MACD_signal']:
+                        if (latest['EMA_12'] < latest['EMA_26'] and 
+                            latest['MACD'] < latest['MACD_signal'] and
+                            latest['RSI'] > 30 and latest['RSI'] < 70 and
+                            latest['close'] < latest['BB_middle']):
                             confirmation_strength += 1
                 except KeyError:
                     continue
         
-        confirmation_level = confirmation_strength / required_confirmations
+        confirmation_level = confirmation_strength / required_confirmations if required_confirmations > 0 else 1.0
         return confirmation_level >= CONFIRMATION_THRESHOLD
     
     async def send_confirmed_signal(self, signal_data):
@@ -96,8 +104,7 @@ class SignalAnalyzer:
             signal_id
         )
         asyncio.create_task(self.track_signal_result(signal_id, signal_data))
-    
-    async def track_signal_result(self, signal_id, signal_data):
+        async def track_signal_result(self, signal_id, signal_data):
         """Отслеживание результата сигнала"""
         symbol = signal_data['symbol']
         timeframe = signal_data['timeframe']
@@ -170,11 +177,14 @@ class SignalAnalyzer:
             signals['EMA'] = 1.0 if latest['EMA_12'] > latest['EMA_26'] else -1.0
             signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
             signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
+            signals['Supertrend'] = 1.0 if latest['Supertrend'] > 0 else -1.0
+            signals['ADX'] = 1.0 if latest['ADX'] > 25 else 0.0
             
             # Осцилляторы
             signals['RSI'] = -1.0 if latest.get('RSI', 0) > 70 else 1.0 if latest.get('RSI', 0) < 30 else 0.0
             signals['Stochastic'] = 1.0 if latest.get('Stoch_k', 0) < 20 and latest.get('Stoch_d', 0) < 20 else -1.0 if latest.get('Stoch_k', 0) > 80 and latest.get('Stoch_d', 0) > 80 else 0.0
             signals['Williams'] = 1.0 if latest.get('Williams', 0) < -80 else -1.0 if latest.get('Williams', 0) > -20 else 0.0
+            signals['CCI'] = 1.0 if latest.get('CCI', 0) < -100 else -1.0 if latest.get('CCI', 0) > 100 else 0.0
             
             # Волатильность
             signals['Bollinger_Bands'] = -1.0 if latest['close'] > latest.get('BB_upper', 0) else 1.0 if latest['close'] < latest.get('BB_lower', 0) else 0.0
