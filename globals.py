@@ -13,9 +13,10 @@ TRADING_PAIRS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
 TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
 
 # Пороговые значения
-SIGNAL_THRESHOLD = 0.85
-MIN_INDICATORS = 5
-CONFIRMATION_THRESHOLD = 0.7  # Порог подтверждения на высшем ТФ
+SIGNAL_THRESHOLD = 0.9  # Увеличено с 0.85 для ~90% вероятности успеха
+MIN_INDICATORS = 7  # Увеличено с 5 для более строгих условий
+CONFIRMATION_THRESHOLD = 0.8  # Увеличено с 0.7 для более надежного подтверждения
+
 # ================================================
 
 # Состояние бота
@@ -26,7 +27,8 @@ bot_status = {
     'data_received': 0,
     'signals_sent': 0,
     'profitable_signals': 0,
-    'unprofitable_signals': 0
+    'unprofitable_signals': 0,
+    'first_run': True  # Добавлено для отслеживания первого запуска
 }
 
 # Данные рынка
