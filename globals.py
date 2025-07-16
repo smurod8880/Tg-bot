@@ -1,7 +1,8 @@
 import os
 
-MANUAL_TELEGRAM_BOT_TOKEN = "8177951186:AAH6h4_BEezrjDFIwdDUfiqxPNv-8aCb8u0"
-MANUAL_TELEGRAM_CHAT_ID = "5331567990"
+# Используем переменные окружения как основной источник
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', "")
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', "")
 
 TRADING_PAIRS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
                  'DOGEUSDT', 'ADAUSDT', 'MATICUSDT', 'AVAXUSDT', 'DOTUSDT']
@@ -56,9 +57,6 @@ indicator_weights = {
     'Combined_Trend_Volume': 0.07,
     'Stability_Filter': 0.08
 }
-
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', MANUAL_TELEGRAM_BOT_TOKEN)
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', MANUAL_TELEGRAM_CHAT_ID)
 
 TIMEFRAME_HIERARCHY = {
     '1m': ['5m', '15m'],
