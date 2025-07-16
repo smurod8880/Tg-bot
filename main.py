@@ -1,3 +1,9 @@
+@app.on_event("startup")
+async def startup_event():
+    # Проверка окружения
+    logger.info("Environment check:")
+    logger.info(f"TELEGRAM_BOT_TOKEN: {'SET' if os.environ.get('TELEGRAM_BOT_TOKEN') else 'MISSING'}")
+    logger.info(f"TELEGRAM_CHAT_ID: {'SET' if os.environ.get('TELEGRAM_CHAT_ID') else 'MISSING'}")
 import sys
 import os
 import logging
