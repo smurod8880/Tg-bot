@@ -51,20 +51,19 @@ async def send_signal(symbol, timeframe, signal_type, strength, accuracy, indica
 <b>Время:</b> {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}
         """
         
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "✅ Успех", "callback_data": f"signal_success:{signal_id}"},
-                    {"text": "❌ Неудача", "callback_data": f"signal_fail:{signal_id}"}
-                ],
-                [{"text": "📊 Отчет", "callback_data": "performance_report"}]
-            ]
-        }
-        
-        await send_telegram_message(message.strip(), keyboard)
+        await send_telegram_message(message.strip())
         
     except Exception as e:
         logger.error(f"Error sending signal: {e}")
+
+async def send_demo_signals():
+    """Отправка демонстрационного сообщения с сигналами для всех пар и таймфреймов"""
+    from globals import TRADING_PAIRS, TIMEFRAMES
+    message = "📊 <b>Демонстрационное сообщение с сигналами</b>\n\n"
+    for symbol in TRADING_PAIRS:
+        for timeframe in TIMEFRAMES:
+            message += f"Пара: {symbol}, Таймфрейм: {timeframe}, Сигнал: Пример BUY, Сила: 90%, Индикаторы: EMA, MACD, RSI\n"
+    await send_telegram_message(message.strip())
 
 async def handle_telegram_updates():
     if not TELEGRAM_BOT_TOKEN:
@@ -84,8 +83,6 @@ async def handle_telegram_updates():
                             offset = update['update_id'] + 1
                             if 'message' in update:
                                 await process_message(update['message'])
-                            elif 'callback_query' in update:
-                                await process_callback_query(update['callback_query'])
         except Exception as e:
             logger.error(f"Telegram update error: {e}")
         await asyncio.sleep(1)
@@ -98,109 +95,16 @@ async def process_message(message):
         return
         
     if text == '/start':
+        if bot_status['running']:
+            await send_telegram_message("🤖 Бот уже запущен!")
+            return
         await send_start_message()
-    elif text == '/status':
-        await send_status_message()
-    elif text == '/performance':
-        await send_performance_report()
-    elif text == '/start_bot':
         from core import init_bot
         await init_bot()
-    elif text == '/stop_bot':
-        from core import stop_bot
-        await stop_bot()
-
-async def process_callback_query(callback_query):
-    try:
-        data = callback_query['data']
-        chat_id = str(callback_query['message']['chat']['id'])
-        callback_id = callback_query['id']
-
-        # 🟢 Telegram требует подтверждение callback-запроса
-        async with aiohttp.ClientSession() as session:
-            await session.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
-                json={"callback_query_id": callback_id}
-            )
-
-        if chat_id != TELEGRAM_CHAT_ID:
-            return
-
-        if data.startswith('signal_success:'):
-            signal_id = data.split(':')[1]
-            await update_signal_result(signal_id, True)
-            await send_telegram_message(f"✅ Сигнал {signal_id[:6]} отмечен как успешный")
-        elif data.startswith('signal_fail:'):
-            signal_id = data.split(':')[1]
-            await update_signal_result(signal_id, False)
-            await send_telegram_message(f"❌ Сигнал {signal_id[:6]} отмечен как неудачный")
-        elif data == 'performance_report':
-            await send_performance_report()
-        elif data == 'start_bot':
-            from core import init_bot
-            await init_bot()
-            await send_telegram_message("🟢 Бот был успешно запущен через Telegram")
-        elif data == 'stop_bot':
-            from core import stop_bot
-            await stop_bot()
-            await send_telegram_message("🔴 Бот был остановлен через Telegram")
-        elif data == 'get_status':
-            await send_status_message()
-    except Exception as e:
-        logger.error(f"Error processing callback: {e}")
-
-async def update_signal_result(signal_id, profitable):
-    from database import update_signal_result as db_update_signal_result
-    db_update_signal_result(signal_id, profitable)
-    
-    if profitable:
-        bot_status['profitable_signals'] += 1
-    else:
-        bot_status['unprofitable_signals'] += 1
-    
-    LearningSystem.update_weights({
-        'id': signal_id,
-        'profitable': profitable
-    })
+        await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
+        if bot_status['first_run']:
+            await send_demo_signals()
+            bot_status['first_run'] = False
 
 async def send_start_message():
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🟢 Запустить бота", "callback_data": "start_bot"}],
-            [{"text": "🔴 Остановить бота", "callback_data": "stop_bot"}],
-            [{"text": "📊 Статус", "callback_data": "get_status"}],
-            [{"text": "📈 Производительность", "callback_data": "performance_report"}]
-        ]
-    }
-    await send_telegram_message("🤖 <b>Crypto Trading Bot PRO</b>\n\nВыберите действие:", keyboard)
-
-async def send_status_message():
-    status = "🟢 Работает" if bot_status['running'] else "🔴 Остановлен"
-    profit_ratio = bot_status['profitable_signals'] / (bot_status['profitable_signals'] + bot_status['unprofitable_signals']) if (bot_status['profitable_signals'] + bot_status['unprofitable_signals']) > 0 else 0
-    
-    message = (
-        f"📊 <b>Статус бота</b>\n\n"
-        f"{status}\n"
-        f"Соединений: {bot_status['connections']}\n"
-        f"Сигналов отправлено: {bot_status['signals_sent']}\n"
-        f"Успешных сигналов: {bot_status['profitable_signals']}\n"
-        f"Неудачных сигналов: {bot_status['unprofitable_signals']}\n"
-        f"Процент успеха: {profit_ratio:.2%}"
-    )
-    await send_telegram_message(message)
-
-async def send_performance_report():
-    report = LearningSystem.get_performance_report()
-    if not report:
-        await send_telegram_message("📊 Данные о производительности отсутствуют")
-        return
-        
-    message = "📈 <b>Отчет по производительности индикаторов</b>\n\n"
-    for item in report[:10]:
-        message += (
-            f"{item['indicator']}:\n"
-            f"  Успешность: {item['success_rate']:.2%}\n"
-            f"  Вес: {item['weight']:.4f}\n\n"
-        )
-    
-    await send_telegram_message(message)
+    await send_telegram_message("🤖 <b>Crypto Trading Bot PRO</b>\n\nБот готов к запуску. Используйте /start для начала анализа.")
