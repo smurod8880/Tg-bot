@@ -176,7 +176,7 @@ class SignalAnalyzer:
                 total_strength += signal * weight
                 total_weight += weight
                 active_indicators.append(indicator)
-        if total_weight == 0 else 1.0
+        if total_weight == 0:
             return 0, []
         signal_strength = total_strength / total_weight
         return signal_strength, active_indicators
