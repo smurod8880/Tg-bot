@@ -25,6 +25,7 @@ async def send_telegram_message(message: str, reply_markup=None):
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
                 if response.status == 200:
+                    logger.info(f"Message sent: {message[:50]}...")
                     bot_status['signals_sent'] += 1
                     return True
     except Exception as e:
@@ -69,6 +70,7 @@ async def send_demo_signal():
 
 async def handle_telegram_updates():
     if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN not set")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
     offset = 0
@@ -82,6 +84,7 @@ async def handle_telegram_updates():
                         for update in data.get('result', []):
                             offset = update['update_id'] + 1
                             if 'message' in update:
+                                logger.info(f"Received message: {update['message'].get('text', 'No text')}")
                                 await process_message(update['message'])
         except Exception as e:
             logger.error(f"Telegram update error: {e}")
@@ -90,12 +93,15 @@ async def handle_telegram_updates():
 async def process_message(message):
     chat_id = str(message['chat']['id'])
     text = message.get('text', '').lower()
+    logger.info(f"Processing message from {chat_id}: {text}")
     if chat_id != TELEGRAM_CHAT_ID:
+        logger.warning(f"Invalid chat_id: {chat_id}")
         return
     if text == '/start':
         if bot_status['running']:
             await send_telegram_message("🤖 Бот уже запущен!")
             return
+        bot_status['first_run'] = True  # Гарантируем, что first_run всегда True для первого запуска
         await send_telegram_message("🤖 <b>Crypto Trading Bot PRO</b>\n\nБот готов к запуску. Используйте /start для начала анализа.")
         from core import init_bot
         await init_bot()
