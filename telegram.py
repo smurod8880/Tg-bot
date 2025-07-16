@@ -115,7 +115,7 @@ async def process_message(message):
         if bot_status['running']:
             await send_telegram_message("🤖 Бот уже запущен!")
             return
-        bot_status['first_run'] = True  # Гарантируем, что first_run всегда True для первого запуска
+        bot_status['first_run'] = True
         await send_telegram_message("🤖 <b>Crypto Trading Bot PRO</b>\n\nБот готов к запуску. Используйте /start для начала анализа.")
         from core import init_bot
         await init_bot()
