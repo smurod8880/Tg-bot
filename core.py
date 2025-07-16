@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from database import init_database, load_weights, save_weights
-from telegram import handle_telegram_updates
 from websocket import start_websocket_connections, stop_websocket_connections
 from signal_analyzer import SignalAnalyzer, stop_analysis
 from globals import bot_status, indicator_weights
@@ -12,25 +11,24 @@ logger = logging.getLogger(__name__)
 async def init_bot():
     """Инициализация и запуск бота"""
     try:
-        if bot_status['running']:
+        if bot_status.get('running', False):
             logger.info("Bot already running")
             return
             
         logger.info("Starting bot...")
-        init_database()
+        
+        # Асинхронная инициализация базы данных
+        await asyncio.to_thread(init_database)
         
         # Загрузка адаптивных весов
-        loaded_weights = load_weights()
+        loaded_weights = await asyncio.to_thread(load_weights)
         if loaded_weights:
             indicator_weights.update(loaded_weights)
         
         # Инициализация системы обучения
         LearningSystem.initialize()
         
-        # Запуск обработки Telegram сообщений
-        asyncio.create_task(handle_telegram_updates())
-        
-        # Запуск WebSocket соединений
+        # Запуск WebSocket соединений (если используется)
         asyncio.create_task(start_websocket_connections())
         
         # Запуск анализатора сигналов
@@ -40,18 +38,26 @@ async def init_bot():
         bot_status['running'] = True
         logger.info("Bot started successfully")
     except Exception as e:
-        logger.exception(f"Bot start failed: {e}")
+        logger.exception(f"Bot start failed: {str(e)}")
         raise
 
 async def stop_bot():
     """Остановка бота"""
-    logger.info("Stopping bot...")
-    bot_status['running'] = False
-    await stop_websocket_connections()
-    stop_analysis()
-    
-    # Сохранение весов перед остановкой
-    save_weights(indicator_weights)
-    LearningSystem.save_performance()
-    
-    logger.info("Bot stopped")
+    try:
+        logger.info("Stopping bot...")
+        bot_status['running'] = False
+        
+        # Остановка WebSocket соединений
+        await stop_websocket_connections()
+        
+        # Остановка анализатора сигналов
+        stop_analysis()
+        
+        # Асинхронное сохранение весов и производительности
+        await asyncio.to_thread(save_weights, indicator_weights)
+        await asyncio.to_thread(LearningSystem.save_performance)
+        
+        logger.info("Bot stopped successfully")
+    except Exception as e:
+        logger.exception(f"Bot stop failed: {str(e)}")
+        raise
