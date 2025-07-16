@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 import uvicorn
 from core import init_bot, stop_bot
-from telegram import send_telegram_message, send_demo_signal, start_telegram_listener
+from telegram import send_telegram_message, send_demo_signal
 from globals import bot_status
 
 # Настройка логгера
@@ -21,19 +21,21 @@ app = FastAPI(title="Crypto Trading Bot Pro", version="2.0")
 @app.on_event("startup")
 async def startup_event():
     logger.info("Bot API started")
-    # Запускаем слушатель Telegram обновлений в фоновом режиме
-    asyncio.create_task(start_telegram_listener())
+    bot_status['running'] = False  # Инициализация состояния
+    bot_status['first_run'] = True  # Убедимся, что демо-сигнал отправляется
 
 @app.get("/")
 def home():
-    return {"status": "Bot is ready", "running": bot_status['running']}
+    return {"status": "Bot is ready", "running": bot_status.get('running', False)}
 
 @app.get("/start")
 async def start():
     if bot_status.get('running', False):
         return {"status": "already_running"}
     try:
+        logger.info("Initiating bot startup...")
         await init_bot()
+        logger.info("Bot initialized, sending Telegram messages...")
         success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
         if not success:
             logger.error("Failed to send initial message to Telegram.")
@@ -44,6 +46,7 @@ async def start():
                 logger.error("Failed to send demo or status message to Telegram.")
             bot_status['first_run'] = False
         bot_status['running'] = True
+        logger.info("Bot started successfully.")
         return {"status": "started"}
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
