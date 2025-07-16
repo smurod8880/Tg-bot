@@ -34,7 +34,7 @@ async def start():
         return {"status": "already_running"}
     try:
         logger.info("Initiating bot startup...")
-        await init_bot()  # Предполагаем, что это может выбросить исключение
+        await init_bot()
         logger.info("Bot initialized, sending Telegram messages...")
         success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
         if not success:
