@@ -26,7 +26,8 @@ async def validate_telegram_token():
     return False
 
 async def send_telegram_message(message: str, max_retries=5):
-    if not await validate_telegram_token():
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        logger.error("Telegram credentials not set. Skipping message.")
         return False
         
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
