@@ -76,7 +76,7 @@ def save_weights(weights):
 
 def load_weights():
     if not os.path.exists(DB_PATH):
-        return None
+        return {}
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
