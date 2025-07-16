@@ -153,7 +153,6 @@ class SignalAnalyzer:
     def calculate_indicator_signals(self, latest):
         signals = {}
         try:
-            # Восстановленный код расчетов сигналов
             signals['EMA'] = 1.0 if latest['EMA_12'] > latest['EMA_26'] else -1.0
             signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
             signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
