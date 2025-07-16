@@ -1,9 +1,3 @@
-@app.on_event("startup")
-async def startup_event():
-    # Проверка окружения
-    logger.info("Environment check:")
-    logger.info(f"TELEGRAM_BOT_TOKEN: {'SET' if os.environ.get('TELEGRAM_BOT_TOKEN') else 'MISSING'}")
-    logger.info(f"TELEGRAM_CHAT_ID: {'SET' if os.environ.get('TELEGRAM_CHAT_ID') else 'MISSING'}")
 import sys
 import os
 import logging
@@ -12,6 +6,10 @@ import uvicorn
 from core import init_bot, stop_bot
 from telegram import send_telegram_message, send_demo_signal
 from globals import bot_status
+
+# Проверка критических переменных окружения
+REQUIRED_ENV_VARS = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
 
 # Настройка логгера
 logging.basicConfig(
@@ -23,11 +21,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+if missing_vars:
+    logger.error("Missing required environment variables: %s", ", ".join(missing_vars))
+    if "RENDER" in os.environ:
+        logger.error("Application will exit due to missing environment variables")
+        sys.exit(1)
+
 app = FastAPI(title="Crypto Trading Bot Pro", version="2.0")
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("Bot API started")
+    logger.info("Environment check:")
+    logger.info(f"TELEGRAM_BOT_TOKEN: {'SET' if os.environ.get('TELEGRAM_BOT_TOKEN') else 'MISSING'}")
+    logger.info(f"TELEGRAM_CHAT_ID: {'SET' if os.environ.get('TELEGRAM_CHAT_ID') else 'MISSING'}")
+    
     bot_status.update({
         'running': False,
         'first_run': True,
@@ -41,7 +49,8 @@ def home():
     return {
         "status": "Bot is ready",
         "running": bot_status.get('running', False),
-        "signals_sent": bot_status.get('signals_sent', 0)
+        "signals_sent": bot_status.get('signals_sent', 0),
+        "telegram_configured": bool(os.environ.get('TELEGRAM_BOT_TOKEN') and bool(os.environ.get('TELEGRAM_CHAT_ID'))
     }
 
 @app.get("/start")
