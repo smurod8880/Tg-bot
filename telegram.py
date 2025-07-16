@@ -17,7 +17,6 @@ async def validate_telegram_token():
     if len(TELEGRAM_BOT_TOKEN) < 20 or ':' not in TELEGRAM_BOT_TOKEN:
         logger.error("Invalid TELEGRAM_BOT_TOKEN format. Obtain a new token from @BotFather.")
         return False
-    # Тестовый запрос для проверки токена
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
     try:
         async with aiohttp.ClientSession() as session:
@@ -69,7 +68,7 @@ async def send_telegram_message(message: str, reply_markup=None, max_retries=5):
                             return False
                         await asyncio.sleep(2 ** attempt + 1)
         except aiohttp.ClientConnectorError as e:
-            logger.error(f"Network error (attempt {attempt + 1}/{max_retries}): {str(e)}. Retrying...")
+            logger.error(f"Network error (attempt {attempt + 1}/{max_retries): {str(e)}. Retrying...")
             if attempt == max_retries - 1:
                 return False
             await asyncio.sleep(2 ** attempt + 1)
