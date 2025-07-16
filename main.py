@@ -30,15 +30,20 @@ def home():
 
 @app.get("/start")
 async def start():
-    if bot_status['running']:
+    if bot_status.get('running', False):
         return {"status": "already_running"}
     try:
         await init_bot()
-        await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
-        if bot_status.get('first_run', True):  # Используем get с значением по умолчанию True
+        success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
+        if not success:
+            logger.error("Failed to send initial message to Telegram.")
+        if bot_status.get('first_run', True):
             await send_demo_signal()
-            await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
+            success = await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
+            if not success:
+                logger.error("Failed to send demo or status message to Telegram.")
             bot_status['first_run'] = False
+        bot_status['running'] = True
         return {"status": "started"}
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
@@ -46,11 +51,14 @@ async def start():
 
 @app.get("/stop")
 async def stop():
-    if not bot_status['running']:
+    if not bot_status.get('running', False):
         return {"status": "already_stopped"}
     try:
         await stop_bot()
-        await send_telegram_message("🔴 Бот остановлен!")
+        success = await send_telegram_message("🔴 Бот остановлен!")
+        if not success:
+            logger.error("Failed to send stop message to Telegram.")
+        bot_status['running'] = False
         return {"status": "stopped"}
     except Exception as e:
         logger.error(f"Error stopping bot: {e}")
