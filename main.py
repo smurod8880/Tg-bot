@@ -21,8 +21,8 @@ app = FastAPI(title="Crypto Trading Bot Pro", version="2.0")
 @app.on_event("startup")
 async def startup_event():
     logger.info("Bot API started")
-    bot_status['running'] = False  # Инициализация состояния
-    bot_status['first_run'] = True  # Убедимся, что демо-сигнал отправляется
+    bot_status['running'] = False
+    bot_status['first_run'] = True
 
 @app.get("/")
 def home():
@@ -35,10 +35,10 @@ async def start():
     try:
         logger.info("Initiating bot startup...")
         await init_bot()
-        logger.info("Bot initialized, sending Telegram messages...")
+        logger.info("Bot initialized, attempting to send Telegram messages...")
         success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
         if not success:
-            logger.error("Failed to send initial message to Telegram.")
+            logger.error("Failed to send initial message to Telegram. Check token and network.")
         if bot_status.get('first_run', True):
             await send_demo_signal()
             success = await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
@@ -50,7 +50,7 @@ async def start():
         return {"status": "started"}
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start bot: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
 @app.get("/stop")
 async def stop():
@@ -65,7 +65,7 @@ async def stop():
         return {"status": "stopped"}
     except Exception as e:
         logger.error(f"Error stopping bot: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to stop bot: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False, access_log=False)
