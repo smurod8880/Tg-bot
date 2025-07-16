@@ -5,6 +5,7 @@ from websocket import start_websocket_connections, stop_websocket_connections
 from signal_analyzer import SignalAnalyzer, stop_analysis
 from globals import bot_status, indicator_weights
 from learning import LearningSystem
+from telegram import send_telegram_message
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ async def init_bot():
         logger.info("Bot started successfully")
     except Exception as e:
         logger.exception("Bot start failed: %s", str(e))
+        await send_telegram_message(f"❌ Ошибка запуска бота: {str(e)[:200]}")
         raise
 
 async def stop_bot():
@@ -64,4 +66,5 @@ async def stop_bot():
         logger.info("Bot stopped successfully")
     except Exception as e:
         logger.exception("Bot stop failed: %s", str(e))
+        await send_telegram_message(f"❌ Ошибка остановки бота: {str(e)[:200]}")
         raise
