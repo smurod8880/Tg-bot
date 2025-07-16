@@ -28,7 +28,7 @@ async def init_bot():
         # Инициализация системы обучения
         LearningSystem.initialize()
         
-        # Запуск WebSocket соединений (если используется)
+        # Запуск WebSocket соединений
         asyncio.create_task(start_websocket_connections())
         
         # Запуск анализатора сигналов
@@ -38,12 +38,16 @@ async def init_bot():
         bot_status['running'] = True
         logger.info("Bot started successfully")
     except Exception as e:
-        logger.exception(f"Bot start failed: {str(e)}")
+        logger.exception("Bot start failed: %s", str(e))
         raise
 
 async def stop_bot():
     """Остановка бота"""
     try:
+        if not bot_status.get('running', False):
+            logger.info("Bot not running")
+            return
+            
         logger.info("Stopping bot...")
         bot_status['running'] = False
         
@@ -53,11 +57,11 @@ async def stop_bot():
         # Остановка анализатора сигналов
         stop_analysis()
         
-        # Асинхронное сохранение весов и производительности
+        # Асинхронное сохранение данных
         await asyncio.to_thread(save_weights, indicator_weights)
         await asyncio.to_thread(LearningSystem.save_performance)
         
         logger.info("Bot stopped successfully")
     except Exception as e:
-        logger.exception(f"Bot stop failed: {str(e)}")
+        logger.exception("Bot stop failed: %s", str(e))
         raise
