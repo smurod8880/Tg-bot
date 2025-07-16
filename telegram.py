@@ -10,7 +10,7 @@ from learning import LearningSystem
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Устанавливаем уровень логирования на INFO
 
-async def send_telegram_message(message: str, reply_markup=None):
+async def send_telegram_message(message: str, reply_markup=None, max_retries=3):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         logger.error("Telegram credentials not set. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in environment variables.")
         return False
@@ -26,22 +26,31 @@ async def send_telegram_message(message: str, reply_markup=None):
     }
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
-                response_text = await response.text()  # Логируем тело ответа
-                if response.status == 200:
-                    logger.info(f"Message sent successfully: {message[:50]}... Response: {response_text[:100]}")
-                    bot_status['signals_sent'] += 1
-                    return True
-                else:
-                    logger.error(f"Failed to send message. Status: {response.status}, Response: {response_text}")
-                    if response.status == 405:
-                        logger.error("405 Method Not Allowed: Ensure POST request is allowed and URL is correct.")
-                    return False
-    except Exception as e:
-        logger.error(f"Error sending to Telegram: {e}")
-        return False
+    for attempt in range(max_retries):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    response_text = await response.text()  # Логируем тело ответа
+                    if response.status == 200:
+                        logger.info(f"Message sent successfully: {message[:50]}... Response: {response_text[:100]}")
+                        bot_status['signals_sent'] += 1
+                        return True
+                    else:
+                        logger.error(f"Failed to send message. Attempt {attempt + 1}/{max_retries}. Status: {response.status}, Response: {response_text}")
+                        if response.status == 405:
+                            logger.error("405 Method Not Allowed: Ensure POST request is allowed and URL is correct. Retrying...")
+                        elif response.status == 429:  # Too Many Requests
+                            retry_after = int(response.headers.get('Retry-After', 5))
+                            await asyncio.sleep(retry_after)
+                            continue
+                        if attempt == max_retries - 1:
+                            return False
+                        await asyncio.sleep(2 ** attempt)  # Экспоненциальная задержка
+        except Exception as e:
+            logger.error(f"Error sending to Telegram (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return False
+            await asyncio.sleep(2 ** attempt)
 
 async def send_signal(symbol, timeframe, signal_type, strength, accuracy, indicators, signal_id):
     try:
