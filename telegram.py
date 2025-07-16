@@ -10,12 +10,30 @@ from learning import LearningSystem
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-async def send_telegram_message(message: str, reply_markup=None, max_retries=5):
+async def validate_telegram_token():
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.error("Telegram credentials not set. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in environment variables.")
+        logger.error("Telegram credentials not set. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.")
         return False
     if len(TELEGRAM_BOT_TOKEN) < 20 or ':' not in TELEGRAM_BOT_TOKEN:
-        logger.error("Invalid TELEGRAM_BOT_TOKEN format. Obtain a new token from @BotFather (e.g., 123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11).")
+        logger.error("Invalid TELEGRAM_BOT_TOKEN format. Obtain a new token from @BotFather.")
+        return False
+    # Тестовый запрос для проверки токена
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status == 200:
+                    logger.info("Telegram token validated successfully.")
+                    return True
+                else:
+                    logger.error(f"Token validation failed. Status: {response.status}, Response: {await response.text()}")
+                    return False
+    except Exception as e:
+        logger.error(f"Error validating token: {str(e)}")
+        return False
+
+async def send_telegram_message(message: str, reply_markup=None, max_retries=5):
+    if not await validate_telegram_token():
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -30,28 +48,28 @@ async def send_telegram_message(message: str, reply_markup=None, max_retries=5):
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=15)) as response:
                     response_text = await response.text()
+                    logger.info(f"API Response (Attempt {attempt + 1}/{max_retries}): Status {response.status}, Text: {response_text[:200]}")
                     if response.status == 200:
-                        logger.info(f"Message sent successfully: {message[:50]}... Response: {response_text[:100]}")
+                        logger.info(f"Message sent successfully: {message[:50]}...")
                         bot_status['signals_sent'] = bot_status.get('signals_sent', 0) + 1
                         return True
                     else:
-                        logger.error(f"Failed to send message. Attempt {attempt + 1}/{max_retries}. Status: {response.status}, Response: {response_text}")
                         if response.status == 405:
-                            logger.error("405 Method Not Allowed: Possible token issue or network restriction. Retrying...")
+                            logger.error("405 Method Not Allowed: Possible network restriction or Telegram API issue.")
                         elif response.status == 429:
                             retry_after = int(response.headers.get('Retry-After', 5))
                             logger.info(f"Rate limited. Waiting {retry_after} seconds...")
                             await asyncio.sleep(retry_after)
                             continue
-                        elif "Unauthorized" in response_text or "invalid token" in response_text.lower():
-                            logger.error("Unauthorized: TELEGRAM_BOT_TOKEN is invalid or expired. Update it immediately.")
+                        elif "Unauthorized" in response_text:
+                            logger.error("Unauthorized: TELEGRAM_BOT_TOKEN is invalid or expired.")
                             return False
                         if attempt == max_retries - 1:
-                            logger.error("Max retries reached. Check Telegram API status or network.")
+                            logger.error(f"Max retries reached. Last response: {response_text}")
                             return False
-                        await asyncio.sleep(2 ** attempt + 1)  # Экспоненциальная задержка с добавкой
-        except aiohttp.ClientConnectorError:
-            logger.error(f"Network error (attempt {attempt + 1}/{max_retries}): Cannot connect to Telegram API. Retrying...")
+                        await asyncio.sleep(2 ** attempt + 1)
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Network error (attempt {attempt + 1}/{max_retries}): {str(e)}. Retrying...")
             if attempt == max_retries - 1:
                 return False
             await asyncio.sleep(2 ** attempt + 1)
@@ -97,5 +115,3 @@ async def send_demo_signal():
 <b>Примечание:</b> Это демонстрационный сигнал. Реальные сигналы будут следовать после анализа.
         """
     await send_telegram_message(message.strip())
-
-# Убраны handle_telegram_updates и process_message, так как не используются в текущем подходе
