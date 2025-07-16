@@ -21,12 +21,12 @@ app = FastAPI(title="Crypto Trading Bot Pro", version="2.0")
 @app.on_event("startup")
 async def startup_event():
     logger.info("Bot API started")
-    bot_status['running'] = False
-    bot_status['first_run'] = True
+    bot_status.clear()
+    bot_status.update({'running': False, 'first_run': True, 'signals_sent': 0})
 
 @app.get("/")
 def home():
-    return {"status": "Bot is ready", "running": bot_status.get('running', False)}
+    return {"status": "Bot is ready", "running": bot_status.get('running', False), "signals_sent": bot_status.get('signals_sent', 0)}
 
 @app.get("/start")
 async def start():
@@ -34,8 +34,8 @@ async def start():
         return {"status": "already_running"}
     try:
         logger.info("Initiating bot startup...")
-        await init_bot()
-        logger.info("Bot initialized, attempting to send Telegram messages...")
+        await init_bot()  # Предполагаем, что это может выбросить исключение
+        logger.info("Bot initialized, sending Telegram messages...")
         success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
         if not success:
             logger.error("Failed to send initial message to Telegram. Check token and network.")
@@ -47,9 +47,9 @@ async def start():
             bot_status['first_run'] = False
         bot_status['running'] = True
         logger.info("Bot started successfully.")
-        return {"status": "started"}
+        return {"status": "started", "signals_sent": bot_status.get('signals_sent', 0)}
     except Exception as e:
-        logger.error(f"Error starting bot: {e}")
+        logger.error(f"Error starting bot: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
 @app.get("/stop")
@@ -64,7 +64,7 @@ async def stop():
         bot_status['running'] = False
         return {"status": "stopped"}
     except Exception as e:
-        logger.error(f"Error stopping bot: {e}")
+        logger.error(f"Error stopping bot: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
 
 if __name__ == "__main__":
