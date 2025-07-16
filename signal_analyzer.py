@@ -153,7 +153,23 @@ class SignalAnalyzer:
     def calculate_indicator_signals(self, latest):
         signals = {}
         try:
-            # ... (остальной код без изменений) ...
+            # Восстановленный код расчетов сигналов
+            signals['EMA'] = 1.0 if latest['EMA_12'] > latest['EMA_26'] else -1.0
+            signals['SMA'] = 1.0 if latest['close'] > latest['SMA_20'] else -1.0
+            signals['MACD'] = 1.0 if latest['MACD'] > latest['MACD_signal'] else -1.0
+            signals['Supertrend'] = 1.0 if latest['Supertrend'] > 0 else -1.0
+            signals['ADX'] = 1.0 if latest['ADX'] > 20 else 0.0
+            signals['RSI'] = -1.0 if latest.get('RSI', 0) > 65 else 1.0 if latest.get('RSI', 0) < 35 else 0.0
+            signals['Stochastic'] = 1.0 if latest.get('Stoch_k', 0) < 25 and latest.get('Stoch_d', 0) < 25 else -1.0 if latest.get('Stoch_k', 0) > 75 and latest.get('Stoch_d', 0) > 75 else 0.0
+            signals['Williams'] = 1.0 if latest.get('Williams', 0) < -75 else -1.0 if latest.get('Williams', 0) > -25 else 0.0
+            signals['CCI'] = 1.0 if latest.get('CCI', 0) < -90 else -1.0 if latest.get('CCI', 0) > 90 else 0.0
+            signals['Bollinger_Bands'] = -1.0 if latest['close'] > latest.get('BB_upper', 0) else 1.0 if latest['close'] < latest.get('BB_lower', 0) else 0.0
+            signals['Keltner_Channel'] = -1.0 if latest['close'] > latest.get('KC_upper', 0) else 1.0 if latest['close'] < latest.get('KC_lower', 0) else 0.0
+            signals['Volume_Oscillator'] = 1.0 if latest.get('Volume_Osc', 0) > 0 else -1.0
+            signals['OBV'] = 1.0 if latest.get('OBV_trend', 0) > 0 else -1.0
+            signals['Engulfing'] = 1.0 if latest.get('Bullish_Engulfing', False) else -1.0 if latest.get('Bearish_Engulfing', False) else 0.0
+            signals['Hammer'] = 1.0 if latest.get('Hammer', False) else 0.0
+            signals['Pin_Bar'] = 1.0 if latest.get('Pin_Bar_bull', False) else -1.0 if latest.get('Pin_Bar_bear', False) else 0.0
         except KeyError as e:
             logger.error("Missing indicator data: %s", str(e))
             return {}
