@@ -43,6 +43,7 @@ async def startup_event():
         'profitable_signals': 0,
         'unprofitable_signals': 0
     })
+    logger.info("Bot status initialized")
 
 @app.get("/")
 def home():
@@ -50,7 +51,7 @@ def home():
         "status": "Bot is ready",
         "running": bot_status.get('running', False),
         "signals_sent": bot_status.get('signals_sent', 0),
-        "telegram_configured": bool(os.environ.get('TELEGRAM_BOT_TOKEN') and bool(os.environ.get('TELEGRAM_CHAT_ID'))
+        "telegram_configured": bool(os.environ.get('TELEGRAM_BOT_TOKEN')) and bool(os.environ.get('TELEGRAM_CHAT_ID'))
     }
 
 @app.get("/start")
@@ -61,10 +62,14 @@ async def start():
         logger.info("Initiating bot startup...")
         await init_bot()
         logger.info("Bot initialized, sending Telegram messages...")
-        await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
+        success = await send_telegram_message("🟢 Подключение к Binance успешно! Анализ начат.")
+        if not success:
+            logger.warning("Failed to send initial Telegram message")
         if bot_status.get('first_run', True):
             await send_demo_signal()
-            await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
+            success = await send_telegram_message("✅ <b>Статус анализа:</b> Подключение успешно, анализ проводится успешно, ожидается генерация сигнала при вероятности 90%+.")
+            if not success:
+                logger.warning("Failed to send status Telegram message")
             bot_status['first_run'] = False
         bot_status['running'] = True
         logger.info("Bot started successfully.")
@@ -79,7 +84,9 @@ async def stop():
         return {"status": "already_stopped"}
     try:
         await stop_bot()
-        await send_telegram_message("🔴 Бот остановлен!")
+        success = await send_telegram_message("🔴 Бот остановлен!")
+        if not success:
+            logger.warning("Failed to send stop Telegram message")
         bot_status['running'] = False
         return {"status": "stopped"}
     except Exception as e:
