@@ -40,6 +40,7 @@ def init_database():
                     total INTEGER DEFAULT 0
                 )
             ''')
+            conn.commit()
         logger.info("Database initialized")
     except Exception as e:
         logger.error("Database init error: %s", str(e))
@@ -51,6 +52,8 @@ def store_signal(signal_id, symbol, timeframe, signal_type, strength, accuracy, 
                 INSERT INTO signals (id, symbol, timeframe, signal_type, strength, accuracy, indicators)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (signal_id, symbol, timeframe, signal_type, strength, accuracy, ','.join(indicators)))
+            conn.commit()
+        logger.info("Signal stored: %s", signal_id)
     except Exception as e:
         logger.error("Store signal error: %s", str(e))
 
@@ -60,6 +63,8 @@ def update_signal_result(signal_id, profitable):
             conn.execute('''
                 UPDATE signals SET profitable = ? WHERE id = ?
             ''', (1 if profitable else 0, signal_id))
+            conn.commit()
+        logger.info("Signal result updated: %s -> %s", signal_id, profitable)
     except Exception as e:
         logger.error("Update signal error: %s", str(e))
 
@@ -71,6 +76,8 @@ def save_weights(weights):
                     INSERT OR REPLACE INTO indicator_weights (indicator, weight)
                     VALUES (?, ?)
                 ''', (indicator, weight))
+            conn.commit()
+        logger.info("Weights saved: %d indicators", len(weights))
     except Exception as e:
         logger.error("Save weights error: %s", str(e))
 
@@ -81,7 +88,9 @@ def load_weights():
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT indicator, weight FROM indicator_weights')
-            return {row[0]: row[1] for row in cursor.fetchall()}
+            weights = {row[0]: row[1] for row in cursor.fetchall()}
+            logger.info("Loaded %d weights from database", len(weights))
+            return weights
     except Exception as e:
         logger.error("Load weights error: %s", str(e))
         return {}
