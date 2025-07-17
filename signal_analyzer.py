@@ -112,9 +112,9 @@ class SignalAnalyzer:
             update_signal_result(signal_id, profitable)
             
             if profitable:
-                bot_status['profitable_signals'] += 1
+                bot_status['profitable_signals'] = bot_status.get('profitable_signals', 0) + 1
             else:
-                bot_status['unprofitable_signals'] += 1
+                bot_status['unprofitable_signals'] = bot_status.get('unprofitable_signals', 0) + 1
                 
             LearningSystem.update_weights({
                 'id': signal_id,
@@ -202,9 +202,11 @@ class SignalAnalyzer:
         return signal_id
 
     def calculate_accuracy(self):
-        total = bot_status['profitable_signals'] + bot_status['unprofitable_signals']
+        profitable = bot_status.get('profitable_signals', 0)
+        unprofitable = bot_status.get('unprofitable_signals', 0)
+        total = profitable + unprofitable
         if total > 0:
-            accuracy = bot_status['profitable_signals'] / total
+            accuracy = profitable / total
             return max(0.7, min(0.98, accuracy))
         return 0.93
 
