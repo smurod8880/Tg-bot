@@ -22,8 +22,8 @@ async def binance_websocket(symbol, timeframe):
                         break
                     data = json.loads(message)
                     await process_kline_data(symbol, timeframe, data.get('k', {}))
-        except websockets.ConnectionClosed:
-            logger.warning("Connection closed for %s %s", symbol, timeframe)
+        except websockets.ConnectionClosed as e:
+            logger.warning("Connection closed for %s %s: %s", symbol, timeframe, str(e))
         except Exception as e:
             logger.error("WebSocket error for %s %s: %s", symbol, timeframe, str(e))
             await asyncio.sleep(5)
@@ -57,7 +57,8 @@ async def process_kline_data(symbol, timeframe, kline):
         elif candle['is_closed']:
             candles.append(candle)
             # Сохраняем только последние 500 свечей
-            market_data[symbol][timeframe] = candles[-500:]
+            if len(candles) > 500:
+                market_data[symbol][timeframe] = candles[-500:]
             bot_status['data_received'] = bot_status.get('data_received', 0) + 1
     except Exception as e:
         logger.error("Error processing kline: %s", str(e))
