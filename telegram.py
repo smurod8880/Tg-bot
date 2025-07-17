@@ -50,7 +50,8 @@ async def send_telegram_message(message: str, max_retries=5):
                         await asyncio.sleep(retry_after)
                         continue
                     else:
-                        logger.error("Failed to send message. Status: %s", response.status)
+                        error_text = await response.text()
+                        logger.error("Failed to send message. Status: %s, Response: %s", response.status, error_text[:200])
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.warning("Network error (attempt %s/%s): %s", attempt+1, max_retries, str(e))
             await asyncio.sleep(2 ** attempt)
