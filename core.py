@@ -25,19 +25,25 @@ async def init_bot():
         loaded_weights = await asyncio.to_thread(load_weights)
         if loaded_weights:
             indicator_weights.update(loaded_weights)
+            logger.info("Loaded weights from database")
+        else:
+            logger.info("Using default weights")
         
         # Инициализация системы обучения
         LearningSystem.initialize()
         
         # Запуск WebSocket соединений
         asyncio.create_task(start_websocket_connections())
+        logger.info("WebSocket connections started")
         
         # Запуск анализатора сигналов
         analyzer = SignalAnalyzer()
         asyncio.create_task(analyzer.analyze_all())
+        logger.info("Signal analysis started")
         
         bot_status['running'] = True
         logger.info("Bot started successfully")
+        await send_telegram_message("🟢 Бот успешно запущен!")
     except Exception as e:
         logger.exception("Bot start failed: %s", str(e))
         await send_telegram_message(f"❌ Ошибка запуска бота: {str(e)[:200]}")
@@ -55,15 +61,19 @@ async def stop_bot():
         
         # Остановка WebSocket соединений
         await stop_websocket_connections()
+        logger.info("WebSocket connections stopped")
         
         # Остановка анализатора сигналов
         stop_analysis()
+        logger.info("Signal analysis stopped")
         
         # Асинхронное сохранение данных
         await asyncio.to_thread(save_weights, indicator_weights)
         await asyncio.to_thread(LearningSystem.save_performance)
+        logger.info("Data saved successfully")
         
         logger.info("Bot stopped successfully")
+        await send_telegram_message("🔴 Бот остановлен!")
     except Exception as e:
         logger.exception("Bot stop failed: %s", str(e))
         await send_telegram_message(f"❌ Ошибка остановки бота: {str(e)[:200]}")
